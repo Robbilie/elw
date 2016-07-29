@@ -1,0 +1,286 @@
+	
+	* {
+		-moz-box-sizing: border-box;
+		-webkit-box-sizing: border-box;
+		-ms-box-sizing: border-box;
+		box-sizing: border-box;
+	}
+
+	html, body {
+		height: 100%;
+		overflow: hidden;
+	}
+
+	body {
+		-webkit-app-region: drag;
+		-webkit-user-select: none;
+		margin: 0;
+		font-size: 0.9em;
+		line-height: 1.5;
+		font-size: 14px;
+		font-family: "Droid Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+		background: #000 url(../img/bg_main.jpg) no-repeat 50% 0;
+		color: white;
+	}
+
+	body:before {
+		content: " ";
+	    background: -webkit-linear-gradient(rgba(255,255,255,.1), rgba(255,255,255,0));
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 0;
+		bottom: 0;
+	}
+
+	.hide {
+		display: none;
+	}
+
+	input, button {
+		-webkit-app-region: no-drag;
+	}
+
+	*[onclick], .click {
+		cursor: pointer;
+		transition: background-color .3s;
+	}
+
+	.click:hover {
+		background-color: rgba(255, 255, 255, .2);
+	}
+
+	nav {
+		position: absolute;
+		top: 0;
+		left: -50%;
+		right: -100%;
+		background: #000;
+		background: rgba(0,0,0,0.4);
+		border-bottom: 1px solid rgba(255,255,255,0.1);
+		height: 50px;
+	}
+
+	nav > div {
+		width: 20%;
+		float: left;
+		height: 100%;
+		text-align: center;
+		text-shadow: 1px 0px 9px rgba(0,0,0,0.32);
+		font-weight: normal;
+		font-style: normal;
+		text-transform: uppercase;
+		-webkit-font-smoothing: antialiased;
+		font-weight: normal;
+		line-height: 50px;
+		font-size: 30px;
+		color: #fff;
+		transition: margin-left .5s;
+	}
+
+	nav > label {
+		position: absolute;
+		right: 40%;
+		top: 0;
+		height: 50px;
+		opacity: 1;
+		transition: opacity .5s;
+	}
+
+	nav > label > img {
+		height: 50px;
+	}
+
+	#left:checked ~ nav > div:first-child, #left:checked ~ main > article:first-child {
+		margin-left: 20%;
+	}
+
+	#right:checked ~ nav > div:first-child, #right:checked ~ main > article:first-child {
+		margin-left: -20%;
+	}
+
+	#right:checked ~ nav > label[for="right"], #left:checked ~ nav > label[for="right"] {
+		pointer-events: none;
+		opacity: 0;
+	}
+
+	#left:not(:checked) ~ nav > div > label[for="left"] {
+		pointer-events: none;
+	}
+
+	#right:not(:checked) ~ nav > div > label[for="right"] {
+		pointer-events: none;
+	}
+
+	#right:not(:checked) ~ nav > label[for="right"], #left:not(:checked) ~ nav > label[for="right"] {
+		cursor: pointer;
+		-webkit-app-region: no-drag;
+	}
+
+	#left:checked ~ nav > div > label[for="left"] {
+		cursor: pointer;
+		-webkit-app-region: no-drag;
+	}
+
+	#right:checked ~ nav > div > label[for="right"] {
+		cursor: pointer;
+		-webkit-app-region: no-drag;
+	}
+
+	main {
+		position: absolute;
+		top: 50px;
+		left: -50%;
+		right: -100%;
+		bottom: 0;
+	}
+
+	article {
+		width: 20%;
+		float: left;
+		height: 100%;
+		transition: margin-left .5s;
+	}
+
+	#overview, #local {
+		padding: 20px 20px 0 20px;
+		z-index: 2;
+	}
+
+	#overview > div, #local > div {
+		overflow: auto;
+	    max-height: 100%;
+	    -webkit-app-region: no-drag;
+		background-color: rgba(0,0,0,.9);
+		box-shadow: 0px 0px 5px 0px #0F0F0F;
+		border: 1px solid rgba(255,255,255,0.1);
+		position: relative;
+	}
+
+	#overview > div > div, #local > div > div {
+		padding: 2px 27px;
+		height: 25px;
+		line-height: 25px;
+		position: relative;
+	}
+
+	#overview > div:empty, #local > div:empty {
+		opacity: 0;
+	}
+
+	#overview > div > div > img, #local > div > div > img {
+		position: absolute;
+		right: 0;
+		top: 0;
+		height: 100%;
+	}
+
+	#overview > div > div > .type, #local > div > div > .type {
+		right: auto;
+		left: 0;
+	}
+
+	#fitting, #settings {
+		height: 100%;
+		padding: 20px 0;
+	}
+
+	#fitting > div, #settings > div {
+		background-color: rgb(60, 68, 68);
+		box-shadow: 0px 0px 5px 0px #0F0F0F;
+		display: inline-block;
+		height: auto;
+		width: 0;
+		min-width: 0;
+		max-height: 100%;
+	    -webkit-app-region: no-drag;
+	    opacity: 0;
+		transition: min-width .5s, opacity .5s;
+	}
+
+	#fitting > div > div, #settings > div > div {
+		padding: 10px;
+	}
+
+	#left:checked ~ main #fitting > div, #right:checked ~ main #settings > div {
+		min-width: 75%;
+		opacity: 1;
+	}
+
+	#fitting > div {
+		float: right;
+		margin-right: -20px;
+	}
+
+	#settings > div {
+		float: left;
+		margin-left: -20px;
+	}
+
+	.item {
+		position: relative;
+		display: inline-block;
+		-webkit-app-region: no-drag;
+		vertical-align: top;
+	}
+
+	.below {
+		margin-left: -32px;
+		margin-top: 32px;
+	}
+
+	.showinfo {
+		background-color: gray;
+		border: 1px solid;
+		width: 250px;
+		display: none;
+		vertical-align: top;
+		padding: 5px;
+		position: absolute;
+		top: -7px;
+		left: -7px;
+		z-index: 3;
+		pointer-events: none;
+	}
+
+	.showinfo details {
+		pointer-events: all;
+	}
+
+	.showinfo > div {
+		clear: both;
+	}
+
+	.showinfo > div:not(:first-child) {
+		margin-top: 37px;
+	}
+
+	.showinfo > div > span {
+		vertical-align: top;
+	}
+
+	.showinfo > div > img {
+		border: 1px solid;
+		position: absolute;
+	}
+
+	.showinfo > div > h4 {
+		margin: -3px 0px 0px 40px;
+	}
+
+	.showinfo > div pre {
+		white-space: pre-wrap;
+	}
+
+	.item:hover > .showinfo {
+		display: block;
+	}
+
+	.fl {
+		float: left;
+		font-weight: bold;
+	}
+
+	.fr {
+		float: right;
+	}

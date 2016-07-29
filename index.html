@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>ELW</title>
+		<link rel="stylesheet" type="text/css" href="./css/style.css">
+		<script src="./js/BigInteger.min.js"></script>
+		<script type="text/javascript" src="./js/static.js"></script>
+		<script type="text/javascript" src="./js/processor.js"></script>
+	</head>
+	<body>
+		<input type="checkbox" class="hide" id="left"/>
+		<input type="checkbox" class="hide" id="right"/>
+		<nav>
+			<div id="fittingName">Fitting</div>
+			<div><label for="left">Overview<label></div>
+			<div><label for="right">Local</label></div>
+			<div>Settings</div>
+			<label for="right"><img src="./img/icons/Settings.png"></label>
+		</nav>
+		<main>
+			<article id="fitting">
+				<div>
+					<div>
+						<div id="shipType" class="item"></div>
+						<h4>Highslots:</h4>
+						<div id="highSlots"></div>
+						<h4>Medslots:</h4>
+						<div id="medSlots"></div>
+						<h4>Lowslots:</h4>
+						<div id="lowSlots"></div>
+						<h4>Subsystems:</h4>
+						<div id="subSlots"></div>
+					</div>
+				</div>
+			</article>
+			<article id="overview">
+				<div></div>
+			</article>
+			<article id="local">
+				<div></div>
+			</article>
+			<article id="settings">
+				<div>
+					<div>
+						<label>Logfile Path:</label>
+						<br>
+						<input type="text" id="filePathField" disabled />
+						<br>
+						<input type="file" id="filePath" webkitdirectory="" directory="" />
+						<br>
+						<label>Hover Mode:</label>
+						<br>
+						<input type="checkbox" id="hoverMode" />
+						<br>
+						<label>Extended Local</label>
+						<br>
+						<input type="checkbox" id="extendedLocal" />
+						<br>
+						<label>Always On Top</label>
+						<br>
+						<input type="checkbox" id="onTop" />
+						<br>
+						<label>Open DevTools</label>
+						<br>
+						<input type="checkbox" id="openDevTools" />
+						<br>
+						<label>Ignored Overview Names</label>
+						<br>
+						<input type="text" id="ignoreOverviewNames" />
+						<br>
+						<label>DEBUG</label>
+						<br>
+						<button onclick="updateLocal('reset');">Reset Local</button>
+						<br>
+						<button onclick="updateOverview('reset');">Reset Overview</button>
+						<br>
+						<button onclick="updateFittings('reset');">Reset Fittings</button>
+						<br>
+						<button onclick="location.reload();">Reload</button>
+					</div>
+				</div>
+			</article>
+		</main>
+		<script type="text/javascript">
+			var fs = require('fs');
+			var shell = require('shell');
+			var remote = require('remote');
+			var path = require('path');
+			var platform = process.platform;
+			
+
+			var watcher;
+
+
+			var dat = "";
+			var ind = 0;
+
+
+			var reading = false;
+
+
+			var files = [];
+			var STORAGE = [];
+			var output = [];
+			var local = [];
+			var overview = [];
+			var fittings = [];
+
+			var curFile = "";
+			var curFitting = -1;
+			var curSolarSystemID = -1;
+			
+			
+			var headers = ['charID', 'corpID', 'allianceID', 'warFactionID', 'role', 'extra'];
+			var jlheaders = ["allianceID", "corpID", "extra", "role", "kp1", "kp2"];
+			var bracketheaders = ["itemID", "ballID", "charID", "ownerID", "typeID", "groupID", "categoryID", "securityStatus", "skin", "corpID", "allianceID", "bounty", "name"];
+
+			var elements = {
+				local: $("#local div"),
+				overview: $("#overview div"),
+				right: $("#right"),
+				left: $("#left"),
+				filePath: $("#filePath"),
+				filePathField: $("#filePathField"),
+				hoverMode: $("#hoverMode"),
+				onTop: $("#onTop"),
+				openDevTools: $("#openDevTools"),
+				extendedLocal: $("#extendedLocal"),
+				ignoreOverviewNames: $("#ignoreOverviewNames"),
+				systemName: $('label[for="right"]'),
+				overviewTab: $('label[for="left"]')
+			};
+
+			var settings = JSON.parse(localStorage.getItem("settings")) || {
+				hoverMode: false,
+				extendedLocal: false,
+				ignoreOverviewNames: [],
+				ignoreOverviewIDs: [],
+				filePath: null,
+				logging: false,
+				storeop: false,
+				onTop: false,
+				openDevTools: false
+			};
+
+			if(remote.process.argv[2]) {
+				startDirWatcher(remote.process.argv[2]);
+			} else if(settings.filePath && settings.filePath != "") {
+				startDirWatcher(settings.filePath);
+			}
+
+			init();
+
+			function init () {
+
+				// Listener
+
+				elements.filePath.addEventListener("change", function (e) {
+					if(e.target.files[0]) setSetting("filePath", e.target.files[0].path);
+					elements.filePathField.value = settings.filePath;
+					startDirWatcher(settings.filePath);
+				});
+
+				elements.hoverMode.addEventListener("change", function (e) {
+					setSetting("hoverMode", e.target.checked);
+				});
+
+				elements.extendedLocal.addEventListener("change", function (e) {
+					setSetting("extendedLocal", e.target.checked);
+				});
+
+				elements.onTop.addEventListener("change", function (e) {
+					setSetting("onTop", e.target.checked);
+					remote.getCurrentWindow().setAlwaysOnTop(e.target.checked);
+				});
+
+				elements.openDevTools.addEventListener("change", function (e) {
+					setSetting("openDevTools", e.target.checked);
+					if(e.target.checked)
+						remote.getCurrentWindow().openDevTools();
+					else
+						remote.getCurrentWindow().closeDevTools();
+				});
+
+				elements.ignoreOverviewNames.addEventListener("change", function (e) {
+					console.log(e);
+					namesToIDs(e.target.value.split(","), function (ids) {
+						var dif = settings.ignoreOverviewIDs.filter(function(i) { return ids.indexOf(i) < 0;});
+						setSetting("ignoreOverviewIDs", ids);
+						setSetting("ignoreOverviewNames", e.target.value.split(","));
+						console.log(ids);
+						console.log(dif);
+						for(var o in overview) {
+							if(dif.indexOf(overview[o].charID) >= 0)
+								updateOverview("add", overview[o]);
+							if(ids.indexOf(overview[o].charID) >= 0)
+								updateOverview("remove", o);
+						}
+					}, false);
+				});
+
+				elements.overviewTab.addEventListener("click", function (e) {
+					curFitting = -1;
+				});
+
+				// set setting vals
+
+				elements.filePathField.value = settings.filePath;
+				elements.hoverMode.checked = settings.hoverMode;
+				elements.extendedLocal.checked = settings.extendedLocal;
+				elements.onTop.checked = settings.onTop;
+				elements.openDevTools.checked = settings.openDevTools;
+				elements.ignoreOverviewNames.value = settings.ignoreOverviewNames.join(",");
+
+				remote.getCurrentWindow().setAlwaysOnTop(settings.onTop)
+				if(settings.openDevTools)
+					remote.getCurrentWindow().openDevTools();
+				else
+					remote.getCurrentWindow().closeDevTools();
+			}
+
+			function startDirWatcher (fp) {
+				if(watcher) watcher.close();
+				if(!fp || fp == "") return;
+				if(platform == "win32") {
+					var fss = fs.readdirSync(fp);
+					if(fss[fss.length - 1])
+						fs.watchFile(fp + path.sep + fss[fss.length - 1], { interval: 500 }, function (curr, prev) {});
+				}
+				watcher = fs.watch(fp, function (event, filename) {
+					if(curFile != filename) console.log(filename);
+
+					if(platform == "win32" && curFile != filename) {
+						fs.unwatchFile(fp + path.sep + curFile);
+						fs.watchFile(fp + path.sep + filename, { interval: 500 }, function (curr, prev) {});
+					}
+
+					if(curFile != filename) files[fp + path.sep + filename] = { row: 0, off: 0 };
+
+					curFile = filename;
+					parseFile(fp + path.sep + filename, filename);
+				});
+			}
+
+			function parseFile (f, fn) {
+				var cnk = "";
+				var off = 0;
+				if(reading) return;
+				reading = true;
+				fs.createReadStream(f, { start: files[f].off }).on("data", function (chunk) { off += chunk.length; cnk += chunk.toString("utf8"); }).on("end", function () {
+					files[f].off += off;
+					reading = false;
+					var data = cnk.split("\n");
+					for(var i = 0; i < data.length; i++) {
+						processClrText(data[i]);
+						var m = data[i].match(/<MarshalStream '(.+?)'>|<MarshalStream "(.+?)">/);
+						if(m && m.length > 1) {
+							STORAGE = [];
+							eval('var n = "' + m[m[1] ? 1 : 2].replace(/"/g, "\\\"") + ' ";');
+							dat = n.replace(/\\x/g, "").hexEncode();
+							ind = 2 + (4 * 2);
+							var tmpo = processSnip();
+							processData(tmpo);
+							if(settings.storeop) output.push(tmpo);
+						}
+					}
+				});
+			}
+
+			function updateSystemName () {
+				getSolarSystem(curSolarSystemID, function (id, data) {
+					if(curSolarSystemID == id)
+						elements.systemName.innerHTML = data.name ? data.name : "Local";
+				});
+			}
+
+			function getSolarSystem (id, cb) {
+				var x = new XMLHttpRequest();
+				x.onreadystatechange = function() {
+					if (x.readyState == 4 && x.status == 200) {
+						cb(id, JSON.parse(x.responseText));
+					}
+				};
+				x.open("GET", "https://public-crest.eveonline.com/solarsystems/" + id + "/", true);
+				x.send();
+			}
+
+			function namesToIDs (names, cb, asoc) {
+				var x = new XMLHttpRequest();
+				x.onreadystatechange = function() {
+					if(x.readyState == 4 && x.status == 200) {
+						var rows = x.responseXML.querySelectorAll("row");
+						var len = rows.length;
+
+						var res = [];
+
+						for (var i = 0; i < len; i++)
+							if(asoc)
+								res[rows[i].getAttribute("name")] =  rows[i].getAttribute("characterID");
+							else
+								res.push(rows[i].getAttribute("characterID"));
+
+						cb(res);
+					}
+				};
+				x.open("POST", "https://api.eveonline.com/eve/CharacterID.xml.aspx", true);
+				x.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+				x.send("names=" + encodeURIComponent(names.join(",")));
+			}
+
+			function IDsToNames (ids, cb, asoc) {
+				var x = new XMLHttpRequest();
+				x.onreadystatechange = function() {
+					if(x.readyState == 4 && x.status == 200) {
+						var rows = x.responseXML.querySelectorAll("row");
+						var len = rows.length;
+
+						var res = [];
+
+						for (var i = 0; i < len; i++)
+							if(asoc)
+								res[rows[i].getAttribute("characterID")] =  rows[i].getAttribute("name");
+							else
+								res.push(rows[i].getAttribute("name"));
+
+						cb(res);
+					}
+				};
+				x.open("POST", "https://api.eveonline.com/eve/CharacterName.xml.aspx", true);
+				x.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+				x.send("ids=" + encodeURIComponent(ids.join(",")));
+			}
+
+			function updateLocal (job, data) {
+				switch(job) {
+					case "reset":
+						local = [];
+					case "clear":
+						elements.local.innerHTML = "";
+						break;
+					case "remove":
+						if($("#local div #local-" + data.charID)) elements.local.removeChild($("#local div #local-" + data.charID));
+						delete local[data];
+						break;
+					case "add":
+						if($("#local div #local-" + data.charID)) elements.local.removeChild($("#local div #local-" + data.charID));
+						local[data.charID] = data;
+						var el = document.createElement("div");
+						el.id = "local-" + data.charID;
+						el.className = "click";
+						el.addEventListener("click", function () {
+							shell.openExternal("https://zkillboard.com/character/" + data.charID + "/");
+						});
+
+						var el1 = document.createElement("img");
+							el1.className = "type";
+							el1.src = 'https://imageserver.eveonline.com/Character/' + data.charID + '_32.jpg';
+						var el2 = document.createElement("span");
+							el2.innerHTML = local[data.charID].charName;
+
+						el.appendChild(el1);
+						el.appendChild(el2);
+
+						if(settings.extendedLocal) {
+							//el.innerHTML += '<img src="https://imageserver.eveonline.com/Corporation/' + local[id].corpID + '_32.png"/>';
+							if(local[data.charID].allianceID) {
+								var el4 = document.createElement("img");
+									el4.src = 'https://imageserver.eveonline.com/Alliance/' + local[data.charID].allianceID + '_32.png';
+								el.appendChild(el4);
+							}
+						}
+
+						elements.local.appendChild(el);
+						sortList(elements.local);
+						break;
+
+				}
+			}
+
+			function updateOverview (job, data) {
+				switch(job) {
+					case "reset":
+						overview = [];
+					case "clear":
+						elements.overview.innerHTML = "";
+						break;
+					case "remove":
+						if($("#overview div #overview-" + data)) elements.overview.removeChild($("#overview div #overview-" + data));
+						break;
+					case "add":
+						if(overview[data.itemID].charID == "None") return;
+						if(settings.ignoreOverviewIDs.indexOf(overview[data.itemID].charID) >= 0) return;
+						if($("#overview div #overview-" + data.itemID)) elements.overview.removeChild($("#overview div #overview-" + data.itemID));
+						var el = document.createElement("div");
+						el.id = "overview-" + data.itemID;
+						el.className = "click";
+						el.addEventListener("click", function () {
+							curFitting = data.itemID;
+							updateFitting(overview[data.itemID].itemID);
+						});
+						el.addEventListener("mouseover", function () {
+							if(settings.hoverMode) {
+								curFitting = data.itemID;
+								updateFitting(overview[data.itemID].itemID);
+							}
+						});
+
+						var el1 = document.createElement("img");
+							el1.className = "type";
+							el1.src = "https://imageserver.eveonline.com/Type/" + overview[data.itemID].typeID + "_32.png";
+						var el2 = document.createElement("span");
+							if(local[overview[data.itemID].charID]) {
+								if(overview[data.itemID]) overview[data.itemID].charName = local[overview[data.itemID].charID].charName; 
+								if(el2) el2.innerHTML = local[overview[data.itemID].charID].charName; 
+							} else {
+								IDsToNames([overview[data.itemID].charID], function (names) { 
+									if(overview[data.itemID]) overview[data.itemID].charName = names[0]; 
+									if(el2) el2.innerHTML = names[0]; 
+									sortList(elements.overview);
+								}, false);
+							}
+						var el3 = document.createElement("span");
+							el3.innerHTML = ' (' + overview[data.itemID].name.replace(/</, "&lt;").replace(/>/, "&gt;") + ')';
+						var el4 = document.createElement("img");
+							el4.src = 'https://imageserver.eveonline.com/Character/' + overview[data.itemID].charID + '_32.jpg';
+
+						el.appendChild(el1);
+						el.appendChild(el2);
+						el.appendChild(el3);
+						el.appendChild(el4);
+
+						elements.overview.appendChild(el);
+						sortList(elements.overview);
+						break;
+				}
+			}
+
+			function sortList (el) {
+				var l = [].slice.call(el.children).sort(function (a, b) { return a.children[1].innerHTML.toLowerCase() > b.children[1].innerHTML.toLowerCase() ? 1 : -1; });
+				for(var p in l)
+					el.appendChild(l[p]);
+			}
+
+			function updateFittings (job, id) {
+				switch(job) {
+					case "reset":
+						fittings = [];
+						break;
+					case "remove":
+						delete fittings[id];
+						break;
+				}
+			}
+
+			function updateFitting (itemID) {
+				$("#highSlots").innerHTML = "";
+				$("#medSlots").innerHTML = "";
+				$("#lowSlots").innerHTML = "";
+				$("#subSlots").innerHTML = "";
+				$("#fittingName").innerHTML = overview[itemID] ? overview[itemID].name : "Fitting";
+				$("#shipType").innerHTML = '<img src="' + (overview[itemID] ? "https://imageserver.eveonline.com/Type/" + overview[itemID].typeID + "_64.png" : "https://imageserver.eveonline.com/Type/0_64.png") + '"/>';
+				if(overview[itemID]) addInfo($("#shipType"), overview[itemID].typeID);
+				if(fittings[itemID]) {
+					for(var f in fittings[itemID]) {
+						var el;
+						var slot = fittings[itemID][f].slot;
+
+						if((slot > 10 && slot < 19) || slot == "low")
+							el = $("#lowSlots");
+						else if((slot > 18 && slot < 27) || slot == "med")
+							el = $("#medSlots");
+						else if((slot > 26 && slot < 35) || slot == "high")
+							el = $("#highSlots");
+						else if((slot > 124 && slot < 133) || slot == "sub")
+							el = $("#subSlots");
+
+						if(!el) console.log(slot);
+						var tmpel = document.createElement("div");
+						tmpel.className = "item";
+						tmpel.innerHTML = '<img src="https://imageserver.eveonline.com/Type/' + fittings[itemID][f].type + '_32.png"/>';
+						addInfo(tmpel, fittings[itemID][f].type);
+						el.appendChild(tmpel);
+						if(fittings[itemID][f].charge && fittings[itemID][f].charge != fittings[itemID][f].type) {
+							var charge = document.createElement("div");
+							charge.className = "item below";
+							charge.innerHTML = '<img src="https://imageserver.eveonline.com/Type/' + fittings[itemID][f].charge + '_32.png"/>';
+							addInfo(charge, fittings[itemID][f].charge);
+							el.appendChild(charge);
+						}
+					}
+				}
+				$("#left").checked = true;
+			}
+
+			function addInfo (el, type) {
+				var x = new XMLHttpRequest();
+					x.onreadystatechange = function() {
+						if(x.readyState == 4 && x.status == 200) {
+							var data = JSON.parse(x.responseText);
+							var newEl = document.createElement("div");
+							newEl.className = "showinfo";
+							newEl.innerHTML += '<div><img class="fl" src="https://imageserver.eveonline.com/Type/' + type + '_32.png" alt="' + data.name + '"><h4 class="fl">' + data.name + '</h4></div>';
+							newEl.innerHTML += '<div><details><summary>Description:</summary><pre>' + data.description + '</pre></details></div>';
+							el.appendChild(newEl);
+						}
+					};
+					x.open("GET", "https://public-crest.eveonline.com/types/" + type + "/", true);
+					x.send();
+			}
+
+			function addToFit (fit, id, type, isCharge, dat) {
+				if(!fittings[fit]) fittings[fit] = [];
+				if(typeof id == "object") {
+					for(var i in id)
+						addToFit(fit, parseInt(id[i]), type, isCharge, dat);
+					return;
+				}
+				if(!fittings[fit][id]) fittings[fit][id] = {};
+				
+				if(isCharge) {
+					fittings[fit][id].charge = dat;
+				} else {
+					fittings[fit][id].type = type;
+					fittings[fit][id].slot = dat;
+				}
+				if(curFitting == fit) updateFitting(fit);
+			}
+
+			function setSetting (name, value) {
+				settings[name] = value;
+				localStorage.setItem("settings", JSON.stringify(settings));
+			}
+
+			function getSetting (name) {
+				return settings[name];
+			}
+
+		</script>
+	</body>
+</html>
